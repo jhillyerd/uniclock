@@ -14,11 +14,12 @@ import math
 import machine
 import network
 import ntptime
+import usocket
 from galactic import GalacticUnicorn
 from picographics import PicoGraphics, DISPLAY_GALACTIC_UNICORN as DISPLAY
 
 try:
-    from secrets import WIFI_SSID, WIFI_PASSWORD
+    from secrets import WIFI_SSID, WIFI_PASSWORD, NTP_SERVER
     wifi_available = True
 except ImportError:
     print("Create secrets.py with your WiFi credentials to get time from NTP")
@@ -134,9 +135,15 @@ def sync_time():
         gu.update(graphics)
 
     if max_wait > 0:
-        print("Connected")
+        print("Wifi connected")
+        print(wlan)
+
+        # Pre-resolution not necessary, but nice for debugging.
+        host_ip = usocket.getaddrinfo(NTP_SERVER, 123)[0][-1][0]
+        print(f"NTP server \"{NTP_SERVER}\" resolved to {host_ip}")
 
         try:
+            ntptime.host = host_ip
             ntptime.settime()
             print("Time set")
         except OSError:
