@@ -18,15 +18,7 @@ import usocket
 from galactic import GalacticUnicorn
 from picographics import PicoGraphics, DISPLAY_GALACTIC_UNICORN as DISPLAY
 
-try:
-    from secrets import WIFI_SSID, WIFI_PASSWORD, NTP_SERVER
-    wifi_available = True
-except ImportError:
-    print("Create secrets.py with your WiFi credentials to get time from NTP")
-    wifi_available = False
-
-
-# constants for controlling the background colour throughout the day
+# Constants for controlling the background colour throughout the day.
 MIDDAY_HUE = 1.1
 MIDNIGHT_HUE = 0.8
 HUE_OFFSET = -0.1
@@ -37,24 +29,33 @@ MIDNIGHT_SATURATION = 1.0
 MIDDAY_VALUE = 0.8
 MIDNIGHT_VALUE = 0.3
 
+# Grab network config.
+try:
+    from secrets import WIFI_SSID, WIFI_PASSWORD, NTP_SERVER
+    wifi_available = True
+except ImportError:
+    print("Create secrets.py with your WiFi credentials to get time from NTP")
+    wifi_available = False
 
-# create galactic object and graphics surface for drawing
+# Create galactic object and graphics surface for drawing.
 gu = GalacticUnicorn()
 graphics = PicoGraphics(DISPLAY)
-
-# create the rtc object
-rtc = machine.RTC()
-
 width = GalacticUnicorn.WIDTH
 height = GalacticUnicorn.HEIGHT
 
-# set up some pens to use later
+# Set up some pens to use later.
 WHITE = graphics.create_pen(255, 255, 255)
 BLACK = graphics.create_pen(0, 0, 0)
 
-def main():
-    gu.set_brightness(0.5)
+# Time keeping globals.
+rtc = machine.RTC()
+utc_offset = 0
+year, month, day, wd, hour, minute, second, _ = rtc.datetime()
+last_second = second
 
+def main():
+    setup_timezone_buttons()
+    gu.set_brightness(0.5)
     sync_time()
 
     print("Entering main loop")
@@ -147,13 +148,13 @@ def sync_time():
     wlan.connect(WIFI_SSID, WIFI_PASSWORD)
 
     # Wait for connect success or failure
-    max_wait = 100
+    max_wait = 30
     while max_wait > 0:
         if wlan.status() < 0 or wlan.status() >= 3:
             break
         max_wait -= 1
         print('Waiting for connection...')
-        time.sleep(0.3)
+        time.sleep(0.5)
 
         redraw_display_if_reqd()
         gu.update(graphics)
@@ -178,30 +179,21 @@ def sync_time():
 
 # NTP synchronizes the time to UTC, this allows you to adjust the displayed time
 # by one hour increments from UTC by pressing the volume up/down buttons
-#
-# We use the IRQ method to detect the button presses to avoid incrementing/decrementing
-# multiple times when the button is held.
-utc_offset = 0
+def setup_timezone_buttons():
+    # We use the IRQ method to detect the button presses to avoid incrementing/decrementing
+    # multiple times when the button is held.
+    up_button = machine.Pin(GalacticUnicorn.SWITCH_VOLUME_UP, machine.Pin.IN, machine.Pin.PULL_UP)
+    down_button = machine.Pin(GalacticUnicorn.SWITCH_VOLUME_DOWN, machine.Pin.IN, machine.Pin.PULL_UP)
 
-up_button = machine.Pin(GalacticUnicorn.SWITCH_VOLUME_UP, machine.Pin.IN, machine.Pin.PULL_UP)
-down_button = machine.Pin(GalacticUnicorn.SWITCH_VOLUME_DOWN, machine.Pin.IN, machine.Pin.PULL_UP)
+    def adjust_utc_offset(pin):
+        global utc_offset
+        if pin == up_button:
+            utc_offset += 1
+        if pin == down_button:
+            utc_offset -= 1
 
-
-def adjust_utc_offset(pin):
-    global utc_offset
-    if pin == up_button:
-        utc_offset += 1
-    if pin == down_button:
-        utc_offset -= 1
-
-
-up_button.irq(trigger=machine.Pin.IRQ_FALLING, handler=adjust_utc_offset)
-down_button.irq(trigger=machine.Pin.IRQ_FALLING, handler=adjust_utc_offset)
-
-
-year, month, day, wd, hour, minute, second, _ = rtc.datetime()
-
-last_second = second
+    up_button.irq(trigger=machine.Pin.IRQ_FALLING, handler=adjust_utc_offset)
+    down_button.irq(trigger=machine.Pin.IRQ_FALLING, handler=adjust_utc_offset)
 
 
 # Check whether the RTC time has changed and if so redraw the display
@@ -236,5 +228,6 @@ def redraw_display_if_reqd():
         outline_text(clock, x, y)
 
         last_second = second
+
 
 main()
