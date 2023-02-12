@@ -52,6 +52,30 @@ height = GalacticUnicorn.HEIGHT
 WHITE = graphics.create_pen(255, 255, 255)
 BLACK = graphics.create_pen(0, 0, 0)
 
+def main():
+    gu.set_brightness(0.5)
+
+    sync_time()
+
+    print("Entering main loop")
+
+    while True:
+        if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_UP):
+            gu.adjust_brightness(+0.01)
+
+        if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_DOWN):
+            gu.adjust_brightness(-0.01)
+
+        if gu.is_pressed(GalacticUnicorn.SWITCH_A):
+            sync_time()
+
+        redraw_display_if_reqd()
+
+        # update the display
+        gu.update(graphics)
+
+        time.sleep(0.01)
+
 
 @micropython.native  # noqa: F821
 def from_hsv(h, s, v):
@@ -128,17 +152,16 @@ def sync_time():
         if wlan.status() < 0 or wlan.status() >= 3:
             break
         max_wait -= 1
-        print('waiting for connection...')
-        time.sleep(0.2)
+        print('Waiting for connection...')
+        time.sleep(0.3)
 
         redraw_display_if_reqd()
         gu.update(graphics)
 
     if max_wait > 0:
-        print("Wifi connected")
-        print(wlan)
+        print(f"Wifi connected: {wlan}")
 
-        # Pre-resolution not necessary, but nice for debugging.
+        # DNS resolution not necessary, but nice for debugging.
         host_ip = usocket.getaddrinfo(NTP_SERVER, 123)[0][-1][0]
         print(f"NTP server \"{NTP_SERVER}\" resolved to {host_ip}")
 
@@ -191,7 +214,7 @@ def redraw_display_if_reqd():
         time_through_day = (((hour * 60) + minute) * 60) + second
         percent_through_day = time_through_day / 86400
         percent_to_midday = 1.0 - ((math.cos(percent_through_day * math.pi * 2) + 1) / 2)
-        print(percent_to_midday)
+        # print(percent_to_midday)
 
         hue = ((MIDDAY_HUE - MIDNIGHT_HUE) * percent_to_midday) + MIDNIGHT_HUE
         sat = ((MIDDAY_SATURATION - MIDNIGHT_SATURATION) * percent_to_midday) + MIDNIGHT_SATURATION
@@ -214,24 +237,4 @@ def redraw_display_if_reqd():
 
         last_second = second
 
-
-gu.set_brightness(0.5)
-
-sync_time()
-
-while True:
-    if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_UP):
-        gu.adjust_brightness(+0.01)
-
-    if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_DOWN):
-        gu.adjust_brightness(-0.01)
-
-    if gu.is_pressed(GalacticUnicorn.SWITCH_A):
-        sync_time()
-
-    redraw_display_if_reqd()
-
-    # update the display
-    gu.update(graphics)
-
-    time.sleep(0.01)
+main()
