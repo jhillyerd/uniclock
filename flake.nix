@@ -11,7 +11,11 @@
           pkgs = nixpkgs.legacyPackages.${system};
         in
         {
-          devShell = pkgs.mkShell { };
+          devShell = pkgs.mkShell {
+            buildInputs = with pkgs; [
+              rshell
+            ];
+          };
         }
       );
 }
