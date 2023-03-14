@@ -15,7 +15,7 @@ from galactic import GalacticUnicorn
 from mqtt_as import MQTTClient, config as MQTT_BASE_CONFIG
 from picographics import PicoGraphics, DISPLAY_GALACTIC_UNICORN as DISPLAY
 
-from secrets import MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD
+from secrets import MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, MQTT_TOPIC
 
 # Constants for controlling the background colour throughout the day.
 MIDDAY_HUE = 1.1
@@ -50,19 +50,26 @@ BLACK = graphics.create_pen(0, 0, 0)
 rtc = machine.RTC()
 utc_offset = 0
 year, month, day, wd, hour, minute, second, _ = rtc.datetime()
-last_second = second
+last_second = -1
 
-def main():
+async def main():
     setup_timezone_buttons()
     gu.set_brightness(0.5)
 
-    print("mqtt setup")
+    # MQTT setup.
+    print("MQTT setup")
     client = setup_mqtt_client()
+    try:
+        await client.connect()
+    except OSError:
+        print("MQTT connection failed.")
+
+    for task in (mqtt_up, mqtt_receiver):
+        asyncio.create_task(task(client))
 
     sync_time()
 
-    print("Entering main loop")
-
+    print("Entering async loop")
     while True:
         if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_UP):
             gu.adjust_brightness(+0.01)
@@ -70,15 +77,10 @@ def main():
         if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_DOWN):
             gu.adjust_brightness(-0.01)
 
-        if gu.is_pressed(GalacticUnicorn.SWITCH_A):
-            sync_time()
-
         redraw_display_if_reqd()
-
-        # update the display
         gu.update(graphics)
 
-        time.sleep(0.01)
+        await asyncio.sleep(0.05)
 
 
 @micropython.native  # noqa: F821
@@ -142,42 +144,16 @@ def outline_text(text, x, y):
 
 # Connect to wifi and synchronize the RTC time from NTP
 def sync_time():
-    if not wifi_available:
-        return
+    # DNS resolution not necessary, but nice for debugging.
+    host_ip = usocket.getaddrinfo(NTP_SERVER, 123)[0][-1][0]
+    print(f"NTP server \"{NTP_SERVER}\" resolved to {host_ip}")
 
-    # Start connection
-    wlan = network.WLAN(network.STA_IF)
-    wlan.active(True)
-    wlan.connect(WIFI_SSID, WIFI_PASSWORD)
-
-    # Wait for connect success or failure
-    max_wait = 30
-    while max_wait > 0:
-        if wlan.status() < 0 or wlan.status() >= 3:
-            break
-        max_wait -= 1
-        print('Waiting for connection...')
-        time.sleep(0.5)
-
-        redraw_display_if_reqd()
-        gu.update(graphics)
-
-    if max_wait > 0:
-        print(f"Wifi connected: {wlan}")
-
-        # DNS resolution not necessary, but nice for debugging.
-        host_ip = usocket.getaddrinfo(NTP_SERVER, 123)[0][-1][0]
-        print(f"NTP server \"{NTP_SERVER}\" resolved to {host_ip}")
-
-        try:
-            ntptime.host = host_ip
-            ntptime.settime()
-            print("Time set")
-        except OSError:
-            pass
-
-    wlan.disconnect()
-    wlan.active(False)
+    try:
+        ntptime.host = host_ip
+        ntptime.settime()
+        print("Time set via NTP")
+    except OSError:
+        pass
 
 
 # NTP synchronizes the time to UTC, this allows you to adjust the displayed time
@@ -251,4 +227,23 @@ def setup_mqtt_client():
     return MQTTClient(config)
 
 
-main()
+async def mqtt_up(client):
+    while True:
+        await client.up.wait()
+        client.up.clear()
+        print("Connected to MQTT broker.")
+        await client.subscribe(MQTT_TOPIC, 1)
+
+
+async def mqtt_receiver(client):
+    # Loop over incoming messages.
+    async for topic, msg, retained in client.queue:
+        print(f'Topic: "{topic.decode()}" Message: "{msg.decode()}" Retained: {retained}')
+        # spawns async task from this message
+        #asyncio.create_task(pulse())
+
+
+try:
+    asyncio.run(main())
+finally:
+    asyncio.new_event_loop()
