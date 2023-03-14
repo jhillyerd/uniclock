@@ -1,11 +1,6 @@
 # Clock example with NTP synchronization
 #
 # Create a secrets.py with your Wifi details to be able to get the time
-# when the Galactic Unicorn isn't connected to Thonny.
-#
-# secrets.py should contain:
-# WIFI_SSID = "Your WiFi SSID"
-# WIFI_PASSWORD = "Your WiFi password"
 #
 # Clock synchronizes time on start, and resynchronizes if you press the A button
 
@@ -14,9 +9,13 @@ import math
 import machine
 import network
 import ntptime
+import uasyncio as asyncio
 import usocket
 from galactic import GalacticUnicorn
+from mqtt_as import MQTTClient, config as MQTT_BASE_CONFIG
 from picographics import PicoGraphics, DISPLAY_GALACTIC_UNICORN as DISPLAY
+
+from secrets import MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD
 
 # Constants for controlling the background colour throughout the day.
 MIDDAY_HUE = 1.1
@@ -56,6 +55,10 @@ last_second = second
 def main():
     setup_timezone_buttons()
     gu.set_brightness(0.5)
+
+    print("mqtt setup")
+    client = setup_mqtt_client()
+
     sync_time()
 
     print("Entering main loop")
@@ -228,6 +231,24 @@ def redraw_display_if_reqd():
         outline_text(clock, x, y)
 
         last_second = second
+
+
+def setup_mqtt_client():
+    config = MQTT_BASE_CONFIG
+
+    # Wifi
+    config["ssid"] = WIFI_SSID
+    config["wifi_pw"] = WIFI_PASSWORD
+
+    # MQTT
+    config["server"] = MQTT_SERVER
+    config["port"] = MQTT_PORT
+    config["user"] = MQTT_USER
+    config["password"] = MQTT_PASSWORD
+    config["queue_len"] = 1 # Use event interface with default queue
+
+    MQTTClient.DEBUG = True
+    return MQTTClient(config)
 
 
 main()
