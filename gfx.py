@@ -80,8 +80,7 @@ def outline_text(text, x, y):
     graphics.text(text, x, y, -1, 1)
 
 
-# Draw the clock display.
-def draw_clock(gu, clock):
+def draw_gradient_for_time(clock):
     percent_to_midday = clock.percent_to_midday()
 
     hue = ((MIDDAY_HUE - MIDNIGHT_HUE) * percent_to_midday) + MIDNIGHT_HUE
@@ -90,14 +89,33 @@ def draw_clock(gu, clock):
     val = ((MIDDAY_VALUE - MIDNIGHT_VALUE) * percent_to_midday) + MIDNIGHT_VALUE
 
     gradient_background(hue, sat, val, hue + HUE_OFFSET, sat, val)
+
+
+# Draw the clock display with background.
+def draw_clock(gu, clock):
+    # Calculate text position so that it is centered.
     graphics.set_font("bitmap8")
-
     text = clock.text()
-
-    # Calculate text position so that it is centred.
     w = graphics.measure_text(text, 1)
     x = int(width / 2 - w / 2 + 1)
     y = 2
 
+    draw_gradient_for_time(clock)
     outline_text(text, x, y)
+    gu.update(graphics)
+
+
+# Draw a centered text message.
+def draw_text(gu, text):
+    # Calculate text position so that it is centered.
+    graphics.set_font("bitmap8")
+    w = graphics.measure_text(text, 1)
+    x = int(width / 2 - w / 2 + 1)
+    y = 2
+
+    graphics.set_pen(BLACK)
+    graphics.clear()
+
+    graphics.set_pen(WHITE)
+    graphics.text(text, x, y, -1, 1)
     gu.update(graphics)

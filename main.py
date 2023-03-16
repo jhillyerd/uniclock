@@ -7,48 +7,55 @@ from clock import Clock
 from galactic import GalacticUnicorn
 from mqtt_as import MQTTClient, config as MQTT_BASE_CONFIG
 
-from secrets import MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, MQTT_TOPIC
 
 # Grab network config.
 try:
     from secrets import WIFI_SSID, WIFI_PASSWORD, NTP_SERVER
-    wifi_available = True
+    from secrets import MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, MQTT_TOPIC
 except ImportError:
-    print("Create secrets.py with your WiFi credentials to get time from NTP")
-    wifi_available = False
+    print("Create secrets.py with your WiFi & MQTT credentials")
 
 gu = GalacticUnicorn()
 clock = Clock(machine.RTC())
 
-
 async def main():
+    global state
+    state = time_state
+
     gu.set_brightness(0.5)
 
     # MQTT setup.
-    client = setup_mqtt_client()
-    try:
-        await client.connect()
-    except OSError:
-        print("MQTT connection failed.")
+    gfx.draw_text(gu, "Net Init")
 
-    for task in (mqtt_up, mqtt_receiver):
-        asyncio.create_task(task(client))
-
+    await setup_mqtt()
     sync_time()
 
-    print("Entering async loop")
     while True:
+        # TODO: move button pressed to own async loop
         if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_UP):
             gu.adjust_brightness(+0.01)
-
         if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_DOWN):
             gu.adjust_brightness(-0.01)
 
-        clock.update_time()
-        if clock.has_changed():
-            gfx.draw_clock(gu, clock)
-
+        await state()
         await asyncio.sleep(0.05)
+
+
+async def time_state():
+    clock.update_time()
+    if clock.has_changed():
+        gfx.draw_clock(gu, clock)
+
+
+def message_state(text):
+    global state
+    async def display_message():
+        global state
+        gfx.draw_text(gu, text)
+        await asyncio.sleep(5)
+        state = time_state
+
+    state = display_message
 
 
 # Synchronize the RTC time from NTP.
@@ -83,6 +90,17 @@ def setup_mqtt_client():
     return MQTTClient(config)
 
 
+async def setup_mqtt():
+    client = setup_mqtt_client()
+    try:
+        await client.connect()
+    except OSError:
+        print("MQTT connection failed.")
+
+    for task in (mqtt_up, mqtt_receiver):
+        asyncio.create_task(task(client))
+
+
 async def mqtt_up(client):
     while True:
         await client.up.wait()
@@ -95,6 +113,7 @@ async def mqtt_receiver(client):
     # Loop over incoming messages.
     async for topic, msg, retained in client.queue:
         print(f'Topic: "{topic.decode()}" Message: "{msg.decode()}" Retained: {retained}')
+        state = message_state(msg.decode())
         # spawns async task from this message
         #asyncio.create_task(pulse())
 
