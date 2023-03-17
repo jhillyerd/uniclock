@@ -12,8 +12,16 @@ class Clock:
 
     def update_time(self):
         # Set time fields.
-        (self.year, self.month, self.day, self.wd, self.hour, self.minute,
-            self.second, _) = self.rtc.datetime()
+        (
+            self.year,
+            self.month,
+            self.day,
+            self.wd,
+            self.hour,
+            self.minute,
+            self.second,
+            _,
+        ) = self.rtc.datetime()
         self.hour += self.utc_offset
 
         # Has the second field changed?

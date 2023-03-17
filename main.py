@@ -18,6 +18,7 @@ except ImportError:
 gu = GalacticUnicorn()
 clock = Clock(machine.RTC())
 
+
 async def main():
     global state
     state = time_state
@@ -49,6 +50,7 @@ async def time_state():
 
 def message_state(text):
     global state
+
     async def display_message():
         global state
         gfx.draw_text(gu, text)
@@ -62,7 +64,7 @@ def message_state(text):
 def sync_time():
     # DNS resolution not necessary, but nice for debugging.
     host_ip = usocket.getaddrinfo(NTP_SERVER, 123)[0][-1][0]
-    print(f"NTP server \"{NTP_SERVER}\" resolved to {host_ip}")
+    print(f'NTP server "{NTP_SERVER}" resolved to {host_ip}')
 
     try:
         ntptime.host = host_ip
@@ -84,7 +86,7 @@ def setup_mqtt_client():
     config["port"] = MQTT_PORT
     config["user"] = MQTT_USER
     config["password"] = MQTT_PASSWORD
-    config["queue_len"] = 1 # Use event interface with default queue
+    config["queue_len"] = 1  # Use event interface with default queue
 
     MQTTClient.DEBUG = True
     return MQTTClient(config)
@@ -113,11 +115,13 @@ async def mqtt_receiver(client):
     # Loop over incoming messages.
     async for topic, msg, retained in client.queue:
         global state
-        print(f'Topic: "{topic.decode()}" Message: "{msg.decode()}"'
-            f' Retained: {retained}')
+        print(
+            f'Topic: "{topic.decode()}" Message: "{msg.decode()}"'
+            f" Retained: {retained}"
+        )
         state = message_state(msg.decode())
         # spawns async task from this message
-        #asyncio.create_task(pulse())
+        # asyncio.create_task(pulse())
 
 
 try:

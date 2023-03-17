@@ -53,13 +53,17 @@ def gradient_background(start_hue, start_sat, start_val, end_hue, end_sat, end_v
         sat = ((end_sat - start_sat) * (x / half_width)) + start_sat
         val = ((end_val - start_val) * (x / half_width)) + start_val
         colour = from_hsv(hue, sat, val)
-        graphics.set_pen(graphics.create_pen(int(colour[0]), int(colour[1]), int(colour[2])))
+        graphics.set_pen(
+            graphics.create_pen(int(colour[0]), int(colour[1]), int(colour[2]))
+        )
         for y in range(0, height):
             graphics.pixel(x, y)
             graphics.pixel(width - x - 1, y)
 
     colour = from_hsv(end_hue, end_sat, end_val)
-    graphics.set_pen(graphics.create_pen(int(colour[0]), int(colour[1]), int(colour[2])))
+    graphics.set_pen(
+        graphics.create_pen(int(colour[0]), int(colour[1]), int(colour[2]))
+    )
     for y in range(0, height):
         graphics.pixel(half_width, y)
 
@@ -84,8 +88,9 @@ def draw_gradient_for_time(clock):
     percent_to_midday = clock.percent_to_midday()
 
     hue = ((MIDDAY_HUE - MIDNIGHT_HUE) * percent_to_midday) + MIDNIGHT_HUE
-    sat = (((MIDDAY_SATURATION - MIDNIGHT_SATURATION) * percent_to_midday)
-        + MIDNIGHT_SATURATION)
+    sat = (
+        (MIDDAY_SATURATION - MIDNIGHT_SATURATION) * percent_to_midday
+    ) + MIDNIGHT_SATURATION
     val = ((MIDDAY_VALUE - MIDNIGHT_VALUE) * percent_to_midday) + MIDNIGHT_VALUE
 
     gradient_background(hue, sat, val, hue + HUE_OFFSET, sat, val)
