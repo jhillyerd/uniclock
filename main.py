@@ -1,5 +1,6 @@
 import collections
 import gfx
+import json
 import machine
 import ntptime
 import uasyncio as asyncio
@@ -69,7 +70,7 @@ def sync_time():
         ntptime.settime()
         print("Time set via NTP")
     except OSError:
-        pass
+        print("Time sync failed")
 
 
 def setup_mqtt_client():
@@ -95,7 +96,7 @@ async def setup_mqtt():
     try:
         await client.connect()
     except OSError:
-        print("MQTT connection failed.")
+        print("MQTT connection failed")
 
     for task in (mqtt_up, mqtt_receiver):
         asyncio.create_task(task(client))
@@ -105,7 +106,7 @@ async def mqtt_up(client):
     while True:
         await client.up.wait()
         client.up.clear()
-        print("Connected to MQTT broker.")
+        print("Connected to MQTT broker")
         await client.subscribe(MQTT_TOPIC, 1)
 
 
@@ -115,7 +116,37 @@ async def mqtt_receiver(client):
         print(
             f'Topic: "{topic.decode()}" Message: "{msg.decode()}" Retained: {retained}'
         )
-        task_queue.append(message_task(msg.decode()))
+
+        try:
+            obj = json.loads(msg.decode())
+        except ValueError:
+            print(f"MQTT JSON decode error on: {msg.decode()}")
+            continue
+
+        mtype = obj["type"]
+        if mtype == "config":
+            handle_config(obj)
+        elif mtype == "message":
+            handle_message(obj)
+        elif mtype == "sync":
+            sync_time()
+        else:
+            print("Received unknown MQTT JSON message type '{mtype}'")
+
+
+def handle_config(obj):
+    print("Reconfiguring")
+    if obj["utc_offset"]:
+        offset = int(obj["utc_offset"])
+        clock.utc_offset = offset
+
+
+def handle_message(obj):
+    message = obj["message"]
+    if message:
+        task_queue.append(message_task(message))
+    else:
+        print("Empty message received: {obj}")
 
 
 async def brightness():
