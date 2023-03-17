@@ -112,7 +112,9 @@ async def mqtt_up(client):
 async def mqtt_receiver(client):
     # Loop over incoming messages.
     async for topic, msg, retained in client.queue:
-        print(f'Topic: "{topic.decode()}" Message: "{msg.decode()}" Retained: {retained}')
+        global state
+        print(f'Topic: "{topic.decode()}" Message: "{msg.decode()}"'
+            f' Retained: {retained}')
         state = message_state(msg.decode())
         # spawns async task from this message
         #asyncio.create_task(pulse())
