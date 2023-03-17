@@ -124,3 +124,8 @@ def draw_text(gu, text):
     graphics.set_pen(WHITE)
     graphics.text(text, x, y, -1, 1)
     gu.update(graphics)
+
+
+# Update display without drawing, ie for brightness change.
+def update(gu):
+    gu.update(graphics)

@@ -54,15 +54,11 @@ async def main():
     sync_time()
     state.set_base(time_state)
 
-    while True:
-        # TODO: move button pressed to own async loop
-        if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_UP):
-            gu.adjust_brightness(+0.01)
-        if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_DOWN):
-            gu.adjust_brightness(-0.01)
+    asyncio.create_task(brightness())
 
+    while True:
         await state.next()
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.1)
 
 
 # Typically the base state of the clock, it checks the current time and redraws
@@ -141,8 +137,17 @@ async def mqtt_receiver(client):
         )
         state.enqueue(message_state(msg.decode()))
 
-        # spawns async task from this message
-        # asyncio.create_task(pulse())
+
+async def brightness():
+    while True:
+        if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_UP):
+            gu.adjust_brightness(+0.01)
+            gfx.update(gu)
+        if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_DOWN):
+            gu.adjust_brightness(-0.01)
+            gfx.update(gu)
+
+        await asyncio.sleep(0.02)
 
 
 try:
