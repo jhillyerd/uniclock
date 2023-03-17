@@ -19,17 +19,40 @@ gu = GalacticUnicorn()
 clock = Clock(machine.RTC())
 
 
+# Tracks the current state of the clock, allowing future states to be queued.
+# If the queue is empty, the base state will be used. States are repsented as
+# async functions.
+class State:
+    def __init__(self, base_state):
+        self.base = base_state
+        self.queue = []
+
+    def set_base(self, state):
+        self.base = state
+
+    def enqueue(self, state):
+        self.queue.append(state)
+
+    def next(self):
+        if len(self.queue):
+            return self.queue.pop(0)()
+        else:
+            return self.base()
+
+
 async def main():
     global state
-    state = time_state
 
+    # Set reasonable default brightness.
     gu.set_brightness(0.5)
 
-    # MQTT setup.
-    gfx.draw_text(gu, "Net Init")
+    state = State(message_state("Net Init"))
+    await state.next()
 
+    # Setup network, MQTT, sync NTP.
     await setup_mqtt()
     sync_time()
+    state.set_base(time_state)
 
     while True:
         # TODO: move button pressed to own async loop
@@ -38,26 +61,25 @@ async def main():
         if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_DOWN):
             gu.adjust_brightness(-0.01)
 
-        await state()
+        await state.next()
         await asyncio.sleep(0.05)
 
 
+# Typically the base state of the clock, it checks the current time and redraws
+# the screen if needed.
 async def time_state():
     clock.update_time()
     if clock.has_changed():
         gfx.draw_clock(gu, clock)
 
 
+# Constructs a state for the requested message text.
 def message_state(text):
-    global state
-
     async def display_message():
-        global state
         gfx.draw_text(gu, text)
         await asyncio.sleep(5)
-        state = time_state
 
-    state = display_message
+    return display_message
 
 
 # Synchronize the RTC time from NTP.
@@ -114,12 +136,11 @@ async def mqtt_up(client):
 async def mqtt_receiver(client):
     # Loop over incoming messages.
     async for topic, msg, retained in client.queue:
-        global state
         print(
-            f'Topic: "{topic.decode()}" Message: "{msg.decode()}"'
-            f" Retained: {retained}"
+            f'Topic: "{topic.decode()}" Message: "{msg.decode()}" Retained: {retained}'
         )
-        state = message_state(msg.decode())
+        state.enqueue(message_state(msg.decode()))
+
         # spawns async task from this message
         # asyncio.create_task(pulse())
 
