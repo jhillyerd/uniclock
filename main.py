@@ -131,7 +131,7 @@ async def mqtt_receiver(client):
         elif mtype == "sync":
             sync_time()
         else:
-            print("Received unknown MQTT JSON message type '{mtype}'")
+            print(f"Received unknown MQTT JSON message type '{mtype}'")
 
 
 def handle_config(obj):
@@ -146,7 +146,7 @@ def handle_message(obj):
     if message:
         task_queue.append(message_task(message))
     else:
-        print("Empty message received: {obj}")
+        print(f"Empty message received: {obj}")
 
 
 async def brightness():
