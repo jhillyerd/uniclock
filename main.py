@@ -2,6 +2,7 @@ import collections
 import gfx
 import json
 import machine
+import math
 import ntptime
 import uasyncio as asyncio
 import usocket
@@ -17,14 +18,26 @@ try:
 except ImportError:
     print("Create secrets.py with your WiFi & MQTT credentials")
 
+LIGHT_SENSOR_AVERAGES = const(6)
+
 gu = GalacticUnicorn()
 clock = Clock(machine.RTC())
 task_queue = collections.deque((), 10, 1)
+
+# Light sensor outputs 0-4095, but usable range is approx 10-2000.
+# Converted to 0-1.0 range by:
+#   Taking the log
+#   Dividing by scale factor
+#   Adding to shift value
+light_shift = -0.3
+light_scale = 6.0
 
 
 async def main():
     # Set reasonable default brightness.
     gu.set_brightness(0.5)
+    asyncio.create_task(light_sense())
+
     gfx.draw_text(gu, "Starting")
 
     # Setup network, MQTT, sync NTP.
@@ -135,10 +148,16 @@ async def mqtt_receiver(client):
 
 
 def handle_config(obj):
-    print("Reconfiguring")
+    global light_shift, light_scale
+
+    print(f"Reconfiguring: {obj}")
     if obj["utc_offset"]:
         offset = int(obj["utc_offset"])
         clock.utc_offset = offset
+    if obj["light_shift"]:
+        light_shift = float(obj["light_shift"])
+    if obj["light_scale"]:
+        light_scale = float(obj["light_scale"])
 
 
 def handle_message(obj):
@@ -159,6 +178,30 @@ async def brightness():
             gfx.update(gu)
 
         await asyncio.sleep(0.02)
+
+
+async def light_sense():
+    prev_bright = gu.get_brightness()
+    lights = [gu.light()] * LIGHT_SENSOR_AVERAGES
+    lights_next = 0
+
+    while True:
+        # Average recent light readings to reduce flicker.
+        lights[lights_next] = gu.light()
+        lights_next = (lights_next + 1) % LIGHT_SENSOR_AVERAGES
+        light = sum(lights) // LIGHT_SENSOR_AVERAGES
+
+        # Scale sensor to screen brightness (0-1.0)
+        bright = (math.log(light) / light_scale) + light_shift
+        bright = max(min(bright, 1.0), 0.0)
+
+        if abs(bright - prev_bright) > 0.03:
+            print(f"bright {prev_bright} -> {bright} for {light}")
+            prev_bright = bright
+            gu.set_brightness(bright)
+            gfx.update(gu)
+
+        await asyncio.sleep(0.1)
 
 
 try:
