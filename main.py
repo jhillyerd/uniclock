@@ -1,3 +1,4 @@
+import collections
 import gfx
 import machine
 import ntptime
@@ -17,60 +18,39 @@ except ImportError:
 
 gu = GalacticUnicorn()
 clock = Clock(machine.RTC())
-
-
-# Tracks the current state of the clock, allowing future states to be queued.
-# If the queue is empty, the base state will be used. States are repsented as
-# async functions.
-class State:
-    def __init__(self, base_state):
-        self.base = base_state
-        self.queue = []
-
-    def set_base(self, state):
-        self.base = state
-
-    def enqueue(self, state):
-        self.queue.append(state)
-
-    def next(self):
-        if len(self.queue):
-            return self.queue.pop(0)()
-        else:
-            return self.base()
+task_queue = collections.deque((), 10, 1)
 
 
 async def main():
-    global state
-
     # Set reasonable default brightness.
     gu.set_brightness(0.5)
-
-    state = State(message_state("Net Init"))
-    await state.next()
+    gfx.draw_text(gu, "Starting")
 
     # Setup network, MQTT, sync NTP.
     await setup_mqtt()
     sync_time()
-    state.set_base(time_state)
 
     asyncio.create_task(brightness())
 
+    tasks = task_queue
+    cl = clock
+
     while True:
-        await state.next()
+        # TODO: Look into async safety for deque.
+        if tasks:
+            # Run queued task.
+            await tasks.popleft()()
+        else:
+            # Base state: render clock.
+            cl.update_time()
+            if cl.has_changed():
+                gfx.draw_clock(gu, cl)
+
         await asyncio.sleep(0.1)
 
 
-# Typically the base state of the clock, it checks the current time and redraws
-# the screen if needed.
-async def time_state():
-    clock.update_time()
-    if clock.has_changed():
-        gfx.draw_clock(gu, clock)
-
-
-# Constructs a state for the requested message text.
-def message_state(text):
+# Constructs a task for the requested message text.
+def message_task(text):
     async def display_message():
         gfx.draw_text(gu, text)
         await asyncio.sleep(5)
@@ -135,7 +115,7 @@ async def mqtt_receiver(client):
         print(
             f'Topic: "{topic.decode()}" Message: "{msg.decode()}" Retained: {retained}'
         )
-        state.enqueue(message_state(msg.decode()))
+        task_queue.append(message_task(msg.decode()))
 
 
 async def brightness():
