@@ -1,4 +1,5 @@
 import math
+import uasyncio as asyncio
 from galactic import GalacticUnicorn
 from picographics import PicoGraphics, DISPLAY_GALACTIC_UNICORN as DISPLAY
 
@@ -19,6 +20,18 @@ height = GalacticUnicorn.HEIGHT
 # Set up some pens to use later.
 WHITE = graphics.create_pen(255, 255, 255)
 BLACK = graphics.create_pen(0, 0, 0)
+
+COLORS = {
+    "black": graphics.create_pen(0, 0, 0),
+    "white": graphics.create_pen(255, 255, 255),
+    "red": graphics.create_pen(255, 0, 0),
+    "green": graphics.create_pen(0, 255, 0),
+    "blue": graphics.create_pen(0, 0, 255),
+    "yellow": graphics.create_pen(255, 255, 0),
+    "purple": graphics.create_pen(255, 0, 255),
+    "cyan": graphics.create_pen(0, 255, 255),
+    "orange": graphics.create_pen(255, 127, 0),
+}
 
 
 @micropython.native  # noqa: F821
@@ -111,21 +124,60 @@ def draw_clock(gu, clock):
 
 
 # Draw a centered text message.
-def draw_text(gu, text):
+def draw_text(gu, text, fg=COLORS["white"], bg=COLORS["black"]):
+    x_margin, y_margin = use_message_font()
+
     # Calculate text position so that it is centered.
-    graphics.set_font("bitmap8")
     w = graphics.measure_text(text, 1)
     x = int(width / 2 - w / 2 + 1)
-    y = 2
 
-    graphics.set_pen(BLACK)
+    graphics.set_pen(bg)
     graphics.clear()
+    graphics.set_pen(fg)
+    graphics.text(text, x, y_margin, -1, 1)
 
-    graphics.set_pen(WHITE)
-    graphics.text(text, x, y, -1, 1)
     gu.update(graphics)
+
+
+# Scroll a text message across the screen.
+async def scroll_text(gu, text, fg=COLORS["white"], bg=COLORS["black"]):
+    x_margin, y_margin = use_message_font()
+    tw = graphics.measure_text(text, 1)
+    x = x_margin
+    off_screen = tw - width
+
+    def draw():
+        graphics.set_pen(bg)
+        graphics.clear()
+        graphics.set_pen(fg)
+        graphics.text(text, x, y_margin, -1, 1)
+        gu.update(graphics)
+
+    if off_screen < 1:
+        # Fits on screen, draw centered and sleep.
+        x = int(width / 2 - tw / 2 + 1)
+        draw()
+        await asyncio.sleep(3.0)
+        return
+
+    draw()
+    await asyncio.sleep(1.0)
+
+    min_x = 0 - off_screen - x_margin
+    while x > min_x:
+        draw()
+        x -= 1
+        await asyncio.sleep(0.05)
+
+    await asyncio.sleep(1.0)
 
 
 # Update display without drawing, ie for brightness change.
 def update(gu):
     gu.update(graphics)
+
+
+# Sets the font for messages, returns X and Y margins.
+def use_message_font():
+    graphics.set_font("bitmap8")
+    return 2, 2

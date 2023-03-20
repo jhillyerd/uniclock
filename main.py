@@ -32,13 +32,23 @@ task_queue = collections.deque((), 10, 1)
 light_shift = -0.3
 light_scale = 6.0
 
+# Status/error message colors.
+status_fg = gfx.COLORS["yellow"]
+status_bg = gfx.COLORS["black"]
+
+# Default configuration.
+config = {
+    "message_fg": "blue",
+    "message_bg": "black",
+}
+
 
 async def main():
-    # Set reasonable default brightness.
-    gu.set_brightness(0.5)
+    # Set reasonable default brightness, start checking sensor.
+    gu.set_brightness(0.4)
     asyncio.create_task(light_sense())
 
-    gfx.draw_text(gu, "Starting")
+    gfx.draw_text(gu, "Starting", fg=status_fg, bg=status_bg)
 
     # Setup network, MQTT, sync NTP.
     await setup_mqtt()
@@ -64,10 +74,11 @@ async def main():
 
 
 # Constructs a task for the requested message text.
-def message_task(text):
+def message_task(text, foreground, background):
     async def display_message():
-        gfx.draw_text(gu, text)
-        await asyncio.sleep(5)
+        await gfx.scroll_text(
+            gu, text, fg=gfx.COLORS[foreground], bg=gfx.COLORS[background]
+        )
 
     return display_message
 
@@ -163,7 +174,13 @@ def handle_config(obj):
 def handle_message(obj):
     message = obj["message"]
     if message:
-        task_queue.append(message_task(message))
+        task_queue.append(
+            message_task(
+                message,
+                obj.get("foreground", config["message_fg"]),
+                obj.get("background", config["message_bg"]),
+            )
+        )
     else:
         print(f"Empty message received: {obj}")
 
