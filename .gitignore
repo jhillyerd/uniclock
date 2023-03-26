@@ -161,4 +161,4 @@ cython_debug/
 #.idea/
 
 /.direnv
-/secrets.py
+secrets.py
