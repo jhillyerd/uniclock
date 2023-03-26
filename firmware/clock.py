@@ -22,7 +22,7 @@ class Clock:
             self.second,
             _,
         ) = self.rtc.datetime()
-        self.hour += self.utc_offset
+        self.hour = (self.hour + self.utc_offset) % 24
 
         # Has the second field changed?
         self.changed = self.second != self.last_second
