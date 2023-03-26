@@ -9,6 +9,8 @@
       (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+
+          scripts = import ./scripts.nix { inherit pkgs; };
         in
         {
           devShell = pkgs.mkShell {
@@ -16,6 +18,8 @@
               black
               rshell
               ruff
+
+              scripts.firmware.ci
             ];
           };
         }
