@@ -11,15 +11,9 @@ from galactic import GalacticUnicorn
 from micropython import const
 from mqtt_as import MQTTClient, config as MQTT_BASE_CONFIG
 
-
-# Grab network config.
-try:
-    from secrets import WIFI_SSID, WIFI_PASSWORD, NTP_SERVER
-    from secrets import MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, MQTT_TOPIC
-except ImportError:
-    print("Create secrets.py with your WiFi & MQTT credentials")
-
-LIGHT_SENSOR_AVERAGES = const(6)
+# These two values control hysterisis for LED brightness.
+LIGHT_SENSOR_SAMPLES = const(6)
+MIN_BRIGHT_STEP = const(0.3)
 
 gu = GalacticUnicorn()
 clock = Clock(machine.RTC())
@@ -45,14 +39,24 @@ config = {
     "message_bg": "black",
 }
 
+# Grab network config.
+try:
+    from secrets import WIFI_SSID, WIFI_PASSWORD, NTP_SERVER
+    from secrets import MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, MQTT_TOPIC
+except ImportError:
+    print("Create secrets.py with your WiFi & MQTT credentials")
+    gfx.draw_text(gu, "secrets.py", fg=gfx.COLORS[error_fg], bg=gfx.COLORS[error_bg])
+    while True:
+        pass
+
 
 async def main():
     # Set reasonable default brightness, start checking sensor.
     gu.set_brightness(0.4)
     asyncio.create_task(light_sense())
 
-    # No scrolling here, prevents startup delay.
-    gfx.draw_text(gu, "Starting", fg=gfx.COLORS[status_fg], bg=gfx.COLORS[status_bg])
+    # No scrolling here, prevents wifi startup delay.
+    gfx.draw_text(gu, "Connecting", fg=gfx.COLORS[status_fg], bg=gfx.COLORS[status_bg])
 
     # Setup network, MQTT, sync NTP.
     await setup_mqtt()
@@ -97,9 +101,9 @@ def sync_time():
         ntptime.host = host_ip
         ntptime.settime()
         print("Time set via NTP")
-        scroll_status("Got NTP")
+        scroll_status("NTP synced")
     except OSError:
-        print("Time sync failed")
+        print("NTP time sync failed")
         scroll_error("Time sync failed")
 
 
@@ -215,14 +219,14 @@ async def brightness():
 
 async def light_sense():
     prev_bright = gu.get_brightness()
-    lights = [gu.light()] * LIGHT_SENSOR_AVERAGES
+    lights = [gu.light()] * LIGHT_SENSOR_SAMPLES
     lights_next = 0
 
     while True:
         # Average recent light readings to reduce flicker.
         lights[lights_next] = gu.light()
-        lights_next = (lights_next + 1) % LIGHT_SENSOR_AVERAGES
-        light = sum(lights) // LIGHT_SENSOR_AVERAGES
+        lights_next = (lights_next + 1) % LIGHT_SENSOR_SAMPLES
+        light = sum(lights) // LIGHT_SENSOR_SAMPLES
 
         # Scale sensor to screen brightness (0-1.0)
         bright = (math.log(light) / light_scale) + light_shift
