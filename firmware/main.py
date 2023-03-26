@@ -11,21 +11,27 @@ from galactic import GalacticUnicorn
 from micropython import const
 from mqtt_as import MQTTClient, config as MQTT_BASE_CONFIG
 
-# These two values control hysterisis for LED brightness.
-LIGHT_SENSOR_SAMPLES = const(6)
-MIN_BRIGHT_STEP = const(0.3)
+# These three values control hysterisis for LED brightness.
+LIGHT_SENSOR_SAMPLES = const(6) # Higher -> slower reaction
+LIGHT_RECENCY_BIAS = const(0.2) # Higher -> faster reaction
+MIN_BRIGHT_STEP = const(0.01)
 
 gu = GalacticUnicorn()
 clock = Clock(machine.RTC())
 task_queue = collections.deque((), 10, 1)
 
 # Light sensor outputs 0-4095, but usable range is approx 10-2000.
-# Converted to 0-1.0 range by:
-#   Taking the log
-#   Dividing by scale factor
+# These defaults are suitable for a bare Unicorn board, but are likely to be
+# too dark for one in an enclosure.
+#
+# Converted to 0-1.0 brightness range by:
+#   Taking the log of sensor output
+#   Multiplyng by scale factor
 #   Adding to shift value
+#
+# Use light_shift to set the minimum brightness, and light_scale the maximum.
 light_shift = -0.3
-light_scale = 6.0
+light_scale = 0.15
 
 # Status/error message colors.
 error_fg = "red"
@@ -218,7 +224,9 @@ async def brightness():
 
 
 async def light_sense():
-    prev_bright = gu.get_brightness()
+    prev_bias = 1.0 - LIGHT_RECENCY_BIAS
+    actual_bright = gu.get_brightness()
+    prev_bright = actual_bright
     lights = [gu.light()] * LIGHT_SENSOR_SAMPLES
     lights_next = 0
 
@@ -228,15 +236,20 @@ async def light_sense():
         lights_next = (lights_next + 1) % LIGHT_SENSOR_SAMPLES
         light = sum(lights) // LIGHT_SENSOR_SAMPLES
 
-        # Scale sensor to screen brightness (0-1.0)
-        bright = (math.log(light) / light_scale) + light_shift
+        # Scale sensor to screen brightness, clamping range to 0 - 1.0.
+        bright = (math.log(light) * light_scale) + light_shift
         bright = max(min(bright, 1.0), 0.0)
 
-        if abs(bright - prev_bright) > 0.03:
+        # Weighted average of previous and current brightness.
+        bright = prev_bright * prev_bias + bright * LIGHT_RECENCY_BIAS
+
+        if abs(bright - actual_bright) > MIN_BRIGHT_STEP:
             print(f"bright {prev_bright} -> {bright} for {light}")
-            prev_bright = bright
             gu.set_brightness(bright)
             gfx.update(gu)
+            actual_bright = bright
+
+        prev_bright = bright
 
         await asyncio.sleep(0.1)
 
