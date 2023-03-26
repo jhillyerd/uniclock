@@ -20,12 +20,15 @@ clock = Clock(machine.RTC())
 task_queue = collections.deque((), 10, 1)
 
 # Light sensor outputs 0-4095, but usable range is approx 10-2000.
-# Converted to 0-1.0 range by:
-#   Taking the log
-#   Dividing by scale factor
+# These defaults are suitable for a bare Unicorn board, but are likely to be
+# too dark for one in an enclosure.
+#
+# Converted to 0-1.0 brightness range by:
+#   Taking the log of sensor output
+#   Multiplyng by scale factor
 #   Adding to shift value
 light_shift = -0.3
-light_scale = 6.0
+light_scale = 0.15
 
 # Status/error message colors.
 error_fg = "red"
@@ -229,7 +232,7 @@ async def light_sense():
         light = sum(lights) // LIGHT_SENSOR_SAMPLES
 
         # Scale sensor to screen brightness (0-1.0)
-        bright = (math.log(light) / light_scale) + light_shift
+        bright = (math.log(light) * light_scale) + light_shift
         bright = max(min(bright, 1.0), 0.0)
 
         if abs(bright - prev_bright) > 0.03:
