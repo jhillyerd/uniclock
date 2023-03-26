@@ -8,6 +8,7 @@ import uasyncio as asyncio
 import usocket
 from clock import Clock
 from galactic import GalacticUnicorn
+from micropython import const
 from mqtt_as import MQTTClient, config as MQTT_BASE_CONFIG
 
 
