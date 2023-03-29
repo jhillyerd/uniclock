@@ -8,7 +8,7 @@
 - [X] Refactored version of Pimoroni's [example clock.py]
 - [X] Scrolls messages sent via an MQTT topic
 - [X] Adjusts display brightness with built-in light sensor
-- [ ] 3D printed wall-mountable case with diffuser support
+- [X] 3D printed wall-mountable case with diffuser support
 - [ ] 12 & 24 hour display modes
 - [ ] Reconfigurable via MQTT message; physical access not required
 - [ ] Updated configuration stored on device
