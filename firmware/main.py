@@ -2,9 +2,7 @@ import gfx
 import json
 import machine
 import math
-import ntptime
 import uasyncio as asyncio
-import usocket
 from clock import Clock
 from galactic import GalacticUnicorn
 from micropython import const
@@ -73,27 +71,11 @@ async def main():
 
     # Setup network, MQTT, sync NTP.
     await setup_mqtt()
-    sync_time()
+    clock.sync_time(NTP_SERVER)
 
     await clock.main_loop()
 
     print("Error: main loop exited!")
-
-
-# Synchronize the RTC time from NTP.
-def sync_time():
-    # DNS resolution not necessary, but nice for debugging.
-    host_ip = usocket.getaddrinfo(NTP_SERVER, 123)[0][-1][0]
-    print(f'NTP server "{NTP_SERVER}" resolved to {host_ip}')
-
-    try:
-        ntptime.host = host_ip
-        ntptime.settime()
-        print("Time set via NTP")
-        clock.scroll_status("NTP synced")
-    except OSError:
-        print("NTP time sync failed")
-        clock.scroll_error("Time sync failed")
 
 
 def setup_mqtt_client():
@@ -162,7 +144,7 @@ async def mqtt_receiver(client):
         elif mtype == "message":
             handle_message(obj)
         elif mtype == "sync":
-            sync_time()
+            clock.sync_time(NTP_SERVER)
         else:
             print(f"Received unknown MQTT JSON message type '{mtype}'")
 

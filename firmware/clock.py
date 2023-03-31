@@ -1,7 +1,9 @@
 import collections
 import gfx
 import math
+import ntptime
 import uasyncio as asyncio
+import usocket
 
 
 # Clock handles task queuing and time-keeping, but not graphics.
@@ -77,3 +79,18 @@ class Clock:
 
     def scroll_status(self, message):
         self.message_task(message, self.config["status_fg"], self.config["status_bg"])
+
+    # Synchronize the RTC time from NTP.
+    def sync_time(self, ntp_host):
+        # DNS resolution not necessary, but nice for debugging.
+        host_ip = usocket.getaddrinfo(ntp_host, 123)[0][-1][0]
+        print(f'NTP server "{ntp_host}" resolved to {host_ip}')
+
+        try:
+            ntptime.host = host_ip
+            ntptime.settime()
+            print("Time set via NTP")
+            self.scroll_status("NTP synced")
+        except OSError:
+            print("NTP time sync failed")
+            self.scroll_error("Time sync failed")
