@@ -15,8 +15,18 @@ LIGHT_SENSOR_SAMPLES = const(6)  # Higher -> slower reaction
 LIGHT_RECENCY_BIAS = const(0.2)  # Higher -> faster reaction
 MIN_BRIGHT_STEP = const(0.01)
 
+# Default configuration.
+config = {
+    "message_fg": "blue",
+    "message_bg": "black",
+    "error_fg": "red",
+    "error_bg": "black",
+    "status_fg": "yellow",
+    "status_bg": "black",
+}
+
 gu = GalacticUnicorn()
-clock = Clock(machine.RTC(), gu)
+clock = Clock(config, machine.RTC(), gu)
 
 # Light sensor outputs 0-4095, but usable range is approx 10-2000.
 # These defaults are suitable for a bare Unicorn board, but are likely to be
@@ -31,17 +41,6 @@ clock = Clock(machine.RTC(), gu)
 light_shift = -0.3
 light_scale = 0.15
 
-# Status/error message colors.
-error_fg = "red"
-error_bg = "black"
-status_fg = "yellow"
-status_bg = "black"
-
-# Default configuration.
-config = {
-    "message_fg": "blue",
-    "message_bg": "black",
-}
 
 # Grab network config.
 try:
@@ -49,7 +48,12 @@ try:
     from secrets import MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, MQTT_TOPIC
 except ImportError:
     print("Create secrets.py with your WiFi & MQTT credentials")
-    gfx.draw_text(gu, "secrets.py", fg=gfx.COLORS[error_fg], bg=gfx.COLORS[error_bg])
+    gfx.draw_text(
+        gu,
+        "secrets.py",
+        fg=gfx.COLORS[config["error_fg"]],
+        bg=gfx.COLORS[config["error_bg"]],
+    )
     while True:
         pass
 
@@ -60,7 +64,12 @@ async def main():
     asyncio.create_task(light_sense())
 
     # No scrolling here, prevents wifi startup delay.
-    gfx.draw_text(gu, "Connecting", fg=gfx.COLORS[status_fg], bg=gfx.COLORS[status_bg])
+    gfx.draw_text(
+        gu,
+        "Connecting",
+        fg=gfx.COLORS[config["status_fg"]],
+        bg=gfx.COLORS[config["status_bg"]],
+    )
 
     # Setup network, MQTT, sync NTP.
     await setup_mqtt()
@@ -81,10 +90,10 @@ def sync_time():
         ntptime.host = host_ip
         ntptime.settime()
         print("Time set via NTP")
-        scroll_status("NTP synced")
+        clock.scroll_status("NTP synced")
     except OSError:
         print("NTP time sync failed")
-        scroll_error("Time sync failed")
+        clock.scroll_error("Time sync failed")
 
 
 def setup_mqtt_client():
@@ -111,7 +120,7 @@ async def setup_mqtt():
         await client.connect()
     except OSError:
         print("MQTT connection failed")
-        scroll_error("MQTT connection failed")
+        clock.scroll_error("MQTT connection failed")
 
     for task in (mqtt_up, mqtt_receiver):
         asyncio.create_task(task(client))
@@ -122,7 +131,7 @@ async def mqtt_up(client):
         await client.up.wait()
         client.up.clear()
         print("Connected to MQTT broker")
-        scroll_status("MQTT connected")
+        clock.scroll_status("MQTT connected")
         await client.subscribe(MQTT_TOPIC, 1)
 
 
@@ -131,7 +140,7 @@ async def mqtt_down(client):
         await client.down.wait()
         client.down.clear()
         print("MQTT connection down")
-        scroll_error("MQTT connection down")
+        clock.scroll_error("MQTT connection down")
 
 
 async def mqtt_receiver(client):
@@ -212,14 +221,6 @@ async def light_sense():
         prev_bright = bright
 
         await asyncio.sleep(0.1)
-
-
-def scroll_error(message):
-    clock.message_task(message, error_fg, error_bg)
-
-
-def scroll_status(message):
-    clock.message_task(message, status_fg, status_bg)
 
 
 try:

@@ -6,7 +6,8 @@ import uasyncio as asyncio
 
 # Clock handles task queuing and time-keeping, but not graphics.
 class Clock:
-    def __init__(self, rtc, galactic_unicorn):
+    def __init__(self, config, rtc, galactic_unicorn):
+        self.config = config
         self.rtc = rtc
         self.gu = galactic_unicorn
 
@@ -70,3 +71,9 @@ class Clock:
             )
 
         self.task_queue.append(display_message)
+
+    def scroll_error(self, message):
+        self.message_task(message, self.config["error_fg"], self.config["error_bg"])
+
+    def scroll_status(self, message):
+        self.message_task(message, self.config["status_fg"], self.config["status_bg"])
