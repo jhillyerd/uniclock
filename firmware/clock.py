@@ -1,15 +1,40 @@
+import collections
+import gfx
 import math
+import ntptime
+import uasyncio as asyncio
+import usocket
 
 
-# Clock handles time-keeping, but not graphics.
+# Clock handles task queuing and time-keeping, but not graphics.
 class Clock:
-    def __init__(self, rtc):
+    def __init__(self, config, rtc, galactic_unicorn):
+        self.config = config
         self.rtc = rtc
+        self.gu = galactic_unicorn
+
+        self.task_queue = collections.deque((), 10, 1)
         self.utc_offset = 0
         self.last_second = -1
 
         self.update_time()
 
+    async def main_loop(self):
+        tasks = self.task_queue
+
+        while True:
+            # TODO: Look into async safety for deque.
+            if tasks:
+                # Run queued task.
+                await tasks.popleft()()
+            else:
+                # Base task: render clock.
+                if self.update_time():
+                    gfx.draw_clock(self.gu, self)
+
+            await asyncio.sleep(0.1)
+
+    # Updates time from RTC, returns true if it has changed.
     def update_time(self):
         # Set time fields.
         (
@@ -25,12 +50,11 @@ class Clock:
         self.hour = (self.hour + self.utc_offset) % 24
 
         # Has the second field changed?
-        self.changed = self.second != self.last_second
-        self.last_second = self.second
+        if self.second != self.last_second:
+            self.last_second = self.second
+            return True
 
-    # Has the time changed since last update?
-    def has_changed(self):
-        return self.changed
+        return False
 
     def percent_to_midday(self):
         time_through_day = (((self.hour * 60) + self.minute) * 60) + self.second
@@ -40,3 +64,33 @@ class Clock:
 
     def text(self):
         return "{:02}:{:02}:{:02}".format(self.hour, self.minute, self.second)
+
+    # Enqueues a task to scroll the specified message text.
+    def message_task(self, text, fg_name, bg_name):
+        async def display_message():
+            await gfx.scroll_text(
+                self.gu, text, fg=gfx.COLORS[fg_name], bg=gfx.COLORS[bg_name]
+            )
+
+        self.task_queue.append(display_message)
+
+    def scroll_error(self, message):
+        self.message_task(message, self.config["error_fg"], self.config["error_bg"])
+
+    def scroll_status(self, message):
+        self.message_task(message, self.config["status_fg"], self.config["status_bg"])
+
+    # Synchronize the RTC time from NTP.
+    def sync_time(self, ntp_host):
+        # DNS resolution not necessary, but nice for debugging.
+        host_ip = usocket.getaddrinfo(ntp_host, 123)[0][-1][0]
+        print(f'NTP server "{ntp_host}" resolved to {host_ip}')
+
+        try:
+            ntptime.host = host_ip
+            ntptime.settime()
+            print("Time set via NTP")
+            self.scroll_status("NTP synced")
+        except OSError:
+            print("NTP time sync failed")
+            self.scroll_error("Time sync failed")
