@@ -35,8 +35,8 @@ class Clock:
             await asyncio.sleep(0.1)
 
     def apply_config(self, config):
-        offset = int(config["utc_offset"])
-        self.utc_offset = offset
+        self.utc_offset = int(config["utc_offset"])
+        self.twentyfour = bool(config["24_hour"])
 
     # Updates time from RTC, returns true if it has changed.
     def update_time(self):
@@ -51,7 +51,10 @@ class Clock:
             self.second,
             _,
         ) = self.rtc.datetime()
-        self.hour = (self.hour + self.utc_offset) % 24
+        if self.twentyfour:
+            self.hour = (self.hour + self.utc_offset) % 24
+        else:
+            self.hour = (self.hour + self.utc_offset) % 12
 
         # Has the second field changed?
         if self.second != self.last_second:
