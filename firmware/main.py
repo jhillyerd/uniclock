@@ -1,4 +1,3 @@
-import collections
 import gfx
 import json
 import machine
@@ -12,13 +11,12 @@ from micropython import const
 from mqtt_as import MQTTClient, config as MQTT_BASE_CONFIG
 
 # These three values control hysterisis for LED brightness.
-LIGHT_SENSOR_SAMPLES = const(6) # Higher -> slower reaction
-LIGHT_RECENCY_BIAS = const(0.2) # Higher -> faster reaction
+LIGHT_SENSOR_SAMPLES = const(6)  # Higher -> slower reaction
+LIGHT_RECENCY_BIAS = const(0.2)  # Higher -> faster reaction
 MIN_BRIGHT_STEP = const(0.01)
 
 gu = GalacticUnicorn()
-clock = Clock(machine.RTC())
-task_queue = collections.deque((), 10, 1)
+clock = Clock(machine.RTC(), gu)
 
 # Light sensor outputs 0-4095, but usable range is approx 10-2000.
 # These defaults are suitable for a bare Unicorn board, but are likely to be
@@ -70,21 +68,9 @@ async def main():
 
     asyncio.create_task(brightness())
 
-    tasks = task_queue
-    cl = clock
+    await clock.main_loop()
 
-    while True:
-        # TODO: Look into async safety for deque.
-        if tasks:
-            # Run queued task.
-            await tasks.popleft()()
-        else:
-            # Base task: render clock.
-            cl.update_time()
-            if cl.has_changed():
-                gfx.draw_clock(gu, cl)
-
-        await asyncio.sleep(0.1)
+    print("Error: main loop exited!")
 
 
 # Constructs a task for the requested message text.
@@ -157,7 +143,9 @@ async def mqtt_down(client):
         await client.down.wait()
         client.down.clear()
         print("MQTT connection down")
-        task_queue.append(message_task("MQTT connection down", status_fg, status_bg))
+        clock.task_queue.append(
+            message_task("MQTT connection down", status_fg, status_bg)
+        )
 
 
 async def mqtt_receiver(client):
@@ -200,7 +188,7 @@ def handle_config(obj):
 def handle_message(obj):
     message = obj["message"]
     if message:
-        task_queue.append(
+        clock.task_queue.append(
             message_task(
                 message,
                 obj.get("foreground", config["message_fg"]),
@@ -255,11 +243,11 @@ async def light_sense():
 
 
 def scroll_error(message):
-    task_queue.append(message_task(message, error_fg, error_bg))
+    clock.task_queue.append(message_task(message, error_fg, error_bg))
 
 
 def scroll_status(message):
-    task_queue.append(message_task(message, status_fg, status_bg))
+    clock.task_queue.append(message_task(message, status_fg, status_bg))
 
 
 try:

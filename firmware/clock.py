@@ -1,15 +1,37 @@
+import collections
+import gfx
 import math
+import uasyncio as asyncio
 
 
-# Clock handles time-keeping, but not graphics.
+# Clock handles task queuing and time-keeping, but not graphics.
 class Clock:
-    def __init__(self, rtc):
+    def __init__(self, rtc, galactic_unicorn):
         self.rtc = rtc
+        self.gu = galactic_unicorn
+
+        self.task_queue = collections.deque((), 10, 1)
         self.utc_offset = 0
         self.last_second = -1
 
         self.update_time()
 
+    async def main_loop(self):
+        tasks = self.task_queue
+
+        while True:
+            # TODO: Look into async safety for deque.
+            if tasks:
+                # Run queued task.
+                await tasks.popleft()()
+            else:
+                # Base task: render clock.
+                if self.update_time():
+                    gfx.draw_clock(self.gu, self)
+
+            await asyncio.sleep(0.1)
+
+    # Updates time from RTC, returns true if it has changed.
     def update_time(self):
         # Set time fields.
         (
@@ -25,12 +47,11 @@ class Clock:
         self.hour = (self.hour + self.utc_offset) % 24
 
         # Has the second field changed?
-        self.changed = self.second != self.last_second
-        self.last_second = self.second
+        if self.second != self.last_second:
+            self.last_second = self.second
+            return True
 
-    # Has the time changed since last update?
-    def has_changed(self):
-        return self.changed
+        return False
 
     def percent_to_midday(self):
         time_through_day = (((self.hour * 60) + self.minute) * 60) + self.second
