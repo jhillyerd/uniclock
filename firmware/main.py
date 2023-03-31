@@ -15,6 +15,8 @@ MIN_BRIGHT_STEP = const(0.01)
 
 # Default configuration.
 config = {
+    "24hour": True,
+    "utc_offset": "1",
     "message_fg": "blue",
     "message_bg": "black",
     "error_fg": "red",
@@ -153,6 +155,7 @@ def handle_config(obj):
     global light_shift, light_scale
 
     print(f"Reconfiguring: {obj}")
+    # TODO: update for Clock.apply_config
     if obj["utc_offset"]:
         offset = int(obj["utc_offset"])
         clock.utc_offset = offset

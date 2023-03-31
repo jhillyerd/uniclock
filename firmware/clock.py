@@ -14,9 +14,9 @@ class Clock:
         self.gu = galactic_unicorn
 
         self.task_queue = collections.deque((), 10, 1)
-        self.utc_offset = 0
         self.last_second = -1
 
+        self.apply_config(config)
         self.update_time()
 
     async def main_loop(self):
@@ -33,6 +33,10 @@ class Clock:
                     gfx.draw_clock(self.gu, self)
 
             await asyncio.sleep(0.1)
+
+    def apply_config(self, config):
+        offset = int(config["utc_offset"])
+        self.utc_offset = offset
 
     # Updates time from RTC, returns true if it has changed.
     def update_time(self):
