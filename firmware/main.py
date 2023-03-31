@@ -66,8 +66,6 @@ async def main():
     await setup_mqtt()
     sync_time()
 
-    asyncio.create_task(brightness())
-
     await clock.main_loop()
 
     print("Error: main loop exited!")
@@ -183,18 +181,6 @@ def handle_message(obj):
         )
     else:
         print(f"Empty message received: {obj}")
-
-
-async def brightness():
-    while True:
-        if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_UP):
-            gu.adjust_brightness(+0.01)
-            gfx.update(gu)
-        if gu.is_pressed(GalacticUnicorn.SWITCH_BRIGHTNESS_DOWN):
-            gu.adjust_brightness(-0.01)
-            gfx.update(gu)
-
-        await asyncio.sleep(0.02)
 
 
 async def light_sense():
