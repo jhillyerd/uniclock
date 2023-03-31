@@ -55,8 +55,8 @@ except ImportError:
 
 
 async def main():
-    # Set reasonable default brightness, start checking sensor.
-    gu.set_brightness(0.4)
+    # Set reasonable startup brightness, start checking sensor.
+    gu.set_brightness(0.2)
     asyncio.create_task(light_sense())
 
     # No scrolling here, prevents wifi startup delay.
@@ -71,16 +71,6 @@ async def main():
     await clock.main_loop()
 
     print("Error: main loop exited!")
-
-
-# Constructs a task for the requested message text.
-def message_task(text, foreground, background):
-    async def display_message():
-        await gfx.scroll_text(
-            gu, text, fg=gfx.COLORS[foreground], bg=gfx.COLORS[background]
-        )
-
-    return display_message
 
 
 # Synchronize the RTC time from NTP.
@@ -143,9 +133,7 @@ async def mqtt_down(client):
         await client.down.wait()
         client.down.clear()
         print("MQTT connection down")
-        clock.task_queue.append(
-            message_task("MQTT connection down", status_fg, status_bg)
-        )
+        scroll_error("MQTT connection down")
 
 
 async def mqtt_receiver(client):
@@ -188,12 +176,10 @@ def handle_config(obj):
 def handle_message(obj):
     message = obj["message"]
     if message:
-        clock.task_queue.append(
-            message_task(
-                message,
-                obj.get("foreground", config["message_fg"]),
-                obj.get("background", config["message_bg"]),
-            )
+        clock.message_task(
+            message,
+            obj.get("foreground", config["message_fg"]),
+            obj.get("background", config["message_bg"]),
         )
     else:
         print(f"Empty message received: {obj}")
@@ -243,11 +229,11 @@ async def light_sense():
 
 
 def scroll_error(message):
-    clock.task_queue.append(message_task(message, error_fg, error_bg))
+    clock.message_task(message, error_fg, error_bg)
 
 
 def scroll_status(message):
-    clock.task_queue.append(message_task(message, status_fg, status_bg))
+    clock.message_task(message, status_fg, status_bg)
 
 
 try:

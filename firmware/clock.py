@@ -61,3 +61,12 @@ class Clock:
 
     def text(self):
         return "{:02}:{:02}:{:02}".format(self.hour, self.minute, self.second)
+
+    # Enqueues a task to scroll the specified message text.
+    def message_task(self, text, fg_name, bg_name):
+        async def display_message():
+            await gfx.scroll_text(
+                self.gu, text, fg=gfx.COLORS[fg_name], bg=gfx.COLORS[bg_name]
+            )
+
+        self.task_queue.append(display_message)
