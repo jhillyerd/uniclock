@@ -140,7 +140,11 @@ async def mqtt_receiver(client):
             print(f"MQTT JSON decode error on: {msg.decode()}")
             continue
 
-        mtype = obj["type"]
+        mtype = obj.get("type", False)
+        if not mtype:
+            print("MQTT JSON message missing required 'type' field")
+            continue
+
         if mtype == "config":
             handle_config(obj)
         elif mtype == "message":
@@ -158,9 +162,9 @@ def handle_config(obj):
     config.update(obj)
     clock.apply_config(config)
 
-    if obj["light_shift"]:
+    if "light_shift" in obj:
         light_shift = float(obj["light_shift"])
-    if obj["light_scale"]:
+    if "light_scale" in obj:
         light_scale = float(obj["light_scale"])
 
 
