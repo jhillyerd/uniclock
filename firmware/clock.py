@@ -51,10 +51,7 @@ class Clock:
             self.second,
             _,
         ) = self.rtc.datetime()
-        if self.twentyfour:
-            self.hour = (self.hour + self.utc_offset) % 24
-        else:
-            self.hour = (self.hour + self.utc_offset) % 12
+        self.hour = (self.hour + self.utc_offset) % 24
 
         # Has the second field changed?
         if self.second != self.last_second:
@@ -70,7 +67,13 @@ class Clock:
         return 1.0 - ((math.cos(percent_through_day * math.pi * 2) + 1) / 2)
 
     def text(self):
-        return "{:02}:{:02}:{:02}".format(self.hour, self.minute, self.second)
+        hour = self.hour
+        if not self.twentyfour:
+            # Twelve hour display format.
+            hour = hour % 12
+            hour = hour if hour != 0 else 12
+
+        return "{:02}:{:02}:{:02}".format(hour, self.minute, self.second)
 
     # Enqueues a task to scroll the specified message text.
     def message_task(self, text, fg_name, bg_name):
