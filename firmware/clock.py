@@ -74,6 +74,9 @@ class Clock:
 
     # Enqueues a task to scroll the specified message text.
     def message_task(self, text, fg_name, bg_name):
+        fg_name = fg_name if fg_name in gfx.COLORS else "white"
+        bg_name = bg_name if bg_name in gfx.COLORS else "black"
+
         async def display_message():
             await gfx.scroll_text(
                 self.gu, text, fg=gfx.COLORS[fg_name], bg=gfx.COLORS[bg_name]
