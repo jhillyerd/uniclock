@@ -73,7 +73,7 @@ async def main():
 
     # Setup network, MQTT, sync NTP.
     await setup_mqtt()
-    clock.sync_time(NTP_SERVER)
+    asyncio.create_task(clock.sync_time_task(NTP_SERVER))
 
     await clock.main_loop()
 
@@ -94,7 +94,7 @@ def setup_mqtt_client():
     config["password"] = MQTT_PASSWORD
     config["queue_len"] = 1  # Use event interface with default queue
 
-    MQTTClient.DEBUG = True
+    MQTTClient.DEBUG = False
     return MQTTClient(config)
 
 
@@ -115,7 +115,7 @@ async def mqtt_up(client):
         await client.up.wait()
         client.up.clear()
         print("Connected to MQTT broker")
-        clock.scroll_status("MQTT connected")
+        clock.scroll_status("MQTT OK")
         await client.subscribe(MQTT_TOPIC, 1)
 
 
