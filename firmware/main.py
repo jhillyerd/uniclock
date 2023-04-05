@@ -13,6 +13,8 @@ LIGHT_SENSOR_SAMPLES = const(6)  # Higher -> slower reaction
 LIGHT_RECENCY_BIAS = const(0.2)  # Higher -> faster reaction
 MIN_BRIGHT_STEP = const(0.01)
 
+CONFIG_FILE = "clock-config.json"
+
 # Default configuration.
 config = {
     "24_hour": True,
@@ -59,6 +61,8 @@ except ImportError:
 
 
 async def main():
+    load_config()
+
     # Set reasonable startup brightness, start checking sensor.
     gu.set_brightness(0.2)
     asyncio.create_task(light_sense())
@@ -156,16 +160,15 @@ async def mqtt_receiver(client):
 
 
 def handle_config(obj):
-    global light_shift, light_scale
-
-    print(f"Reconfiguring: {obj}")
     config.update(obj)
-    clock.apply_config(config)
+    config.pop("persist", False)
+    apply_config()
 
-    if "light_shift" in obj:
-        light_shift = float(obj["light_shift"])
-    if "light_scale" in obj:
-        light_scale = float(obj["light_scale"])
+    if obj.get("persist", False):
+        f = open(CONFIG_FILE, "w")
+        f.write(json.dumps(config))
+        f.close()
+        print("Updated config persisted")
 
 
 def handle_message(obj):
@@ -178,6 +181,33 @@ def handle_message(obj):
         )
     else:
         print(f"Empty message received: {obj}")
+
+
+# Applies the global config dictionary settings.
+def apply_config():
+    global light_shift, light_scale
+    clock.apply_config(config)
+
+    if "light_shift" in config:
+        light_shift = float(config["light_shift"])
+    if "light_scale" in config:
+        light_scale = float(config["light_scale"])
+
+
+# Loads persisted config from flash and applies it.
+def load_config():
+    global config
+    try:
+        f = open(CONFIG_FILE)
+        config = json.load(f)
+        f.close()
+
+        print(f"Applying config found in {CONFIG_FILE}")
+        apply_config()
+    except OSError:
+        print(f"Warning: failed to read {CONFIG_FILE}")
+    except ValueError:
+        print(f"Error: failed to parse {CONFIG_FILE} as JSON")
 
 
 async def light_sense():

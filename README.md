@@ -10,8 +10,8 @@
 - [X] Adjusts display brightness with built-in light sensor
 - [X] 3D printed wall-mountable case with diffuser support
 - [X] 12 & 24 hour display modes
-- [ ] Reconfigurable via MQTT message; physical access not required
-- [ ] Updated configuration stored on device
+- [X] Reconfigurable via MQTT message; physical access not required
+- [X] Updated configuration stored on device
 - [ ] Installation guide and assembly tips ;)
 
 
