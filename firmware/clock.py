@@ -93,6 +93,13 @@ class Clock:
     def scroll_status(self, message):
         self.message_task(message, self.config["status_fg"], self.config["status_bg"])
 
+    async def sync_time_task(self, ntp_host):
+        while True:
+            print(f"Starting NTP sync at {self.text()}")
+            self.sync_time(ntp_host)
+
+            await asyncio.sleep(60 * 60) # Hourly
+
     # Synchronize the RTC time from NTP.
     def sync_time(self, ntp_host):
         # DNS resolution not necessary, but nice for debugging.
